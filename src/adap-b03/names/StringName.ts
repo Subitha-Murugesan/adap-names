@@ -1,66 +1,20 @@
 import { DEFAULT_DELIMITER, ESCAPE_CHARACTER } from "../common/Printable";
 import { Name } from "./Name";
+import { AbstractName } from "./AbstractName";
 
-export class StringName implements Name {
-    protected delimiter: string;
-    protected name: string;
-    protected noComponents: number;
+export class StringName extends AbstractName {
 
-    constructor(source: string = "", delimiter: string = DEFAULT_DELIMITER) {
-        this.delimiter = delimiter;
+    protected name: string = "";
+    protected noComponents: number = 0;
+
+    constructor(source: string, delimiter?: string) {
+        super(delimiter);
         this.name = source;
         this.noComponents = this.parseComponents().length;
     }
 
-    private escapeComponent(component: string): string {
-        return component
-            .replaceAll(ESCAPE_CHARACTER, ESCAPE_CHARACTER + ESCAPE_CHARACTER)
-            .replaceAll(this.delimiter, ESCAPE_CHARACTER + this.delimiter);
-    }
-
-    private parseComponents(): string[] {
-        const result: string[] = [];
-        let current = "";
-        let escaped = false;
-
-        for (const ch of this.name) {
-            if (escaped) {
-                current += ch;
-                escaped = false;
-            } else if (ch === ESCAPE_CHARACTER) {
-                escaped = true;
-            } else if (ch === this.delimiter) {
-                result.push(current);
-                current = "";
-            } else {
-                current += ch;
-            }
-        }
-
-        result.push(current);
-        return result;
-    }
-
-    private rebuild(components: string[]): void {
-        this.name = components.map(c => this.escapeComponent(c)).join(this.delimiter);
-        this.noComponents = components.length;
-    }
-
-    public asString(delimiter: string = this.delimiter): string {
-        const components = this.parseComponents();
-        return components.join(delimiter);
-    }
-
-    public asDataString(): string {
-        return this.name;
-    }
-
-    public getDelimiterCharacter(): string {
-        return this.delimiter;
-    }
-
-    public isEmpty(): boolean {
-        return this.noComponents === 0 || this.name.length === 0;
+    public clone(): Name {
+        return new StringName(this.name, this.delimiter);
     }
 
     public getNoComponents(): number {
@@ -68,47 +22,78 @@ export class StringName implements Name {
     }
 
     public getComponent(i: number): string {
-        const components = this.parseComponents();
-        if (i < 0 || i >= components.length)
-            throw new Error(`Index ${i} out of range`);
-        return components[i];
+        return this.parseComponents()[i];
     }
 
-    public setComponent(i: number, c: string): void {
-        const components = this.parseComponents();
-        if (i < 0 || i >= components.length)
-            throw new Error(`Index ${i} out of range`);
+    public setComponent(i: number, c: string) {
+        let components = this.parseComponents();
         components[i] = c;
-        this.rebuild(components);
+        this.name = this.buildString(components);
     }
 
-    public insert(i: number, c: string): void {
-        const components = this.parseComponents();
-        if (i < 0 || i > components.length)
-            throw new Error(`Index ${i} out of range`);
+    public insert(i: number, c: string) {
+        let components = this.parseComponents();
         components.splice(i, 0, c);
-        this.rebuild(components);
+        this.name = this.buildString(components);
+        this.noComponents = components.length;
     }
 
-    public append(c: string): void {
-        const components = this.parseComponents();
+    public append(c: string) {
+        let components = this.parseComponents();
         components.push(c);
-        this.rebuild(components);
+        this.name = this.buildString(components);
+        this.noComponents = components.length;
     }
 
-    public remove(i: number): void {
-        const components = this.parseComponents();
-        if (i < 0 || i >= components.length)
-            throw new Error(`Index ${i} out of range`);
+    public remove(i: number) {
+        let components = this.parseComponents();
         components.splice(i, 1);
-        this.rebuild(components);
+        this.name = this.buildString(components);
+        this.noComponents = components.length;
     }
 
-    public concat(other: Name): void {
-        const components = this.parseComponents();
-        for (let i = 0; i < other.getNoComponents(); i++) {
-            components.push(other.getComponent(i));
+    private parseComponents(): string[] {
+        if (this.name === "") {
+            return [];
         }
-        this.rebuild(components);
+        
+        let components: string[] = [];
+        let currentComponent = "";
+        let i = 0;
+        
+        while (i < this.name.length) {
+            if (this.name[i] === ESCAPE_CHARACTER && i + 1 < this.name.length) {
+                currentComponent += this.name[i + 1];
+                i += 2;
+            } else if (this.name[i] === this.delimiter) {
+                components.push(currentComponent);
+                currentComponent = "";
+                i++;
+            } else {
+                currentComponent += this.name[i];
+                i++;
+            }
+        }
+        
+        components.push(currentComponent);
+        return components;
     }
+
+    private buildString(components: string[]): string {
+        let result: string[] = [];
+        for (let i = 0; i < components.length; i++) {
+            let component = components[i];
+            let escaped = '';
+            for (let j = 0; j < component.length; j++) {
+                let c = component.charAt(j);
+                if (c === this.delimiter || c === ESCAPE_CHARACTER) {
+                    escaped += ESCAPE_CHARACTER;
+                }
+                escaped += c;
+            }
+            result.push(escaped);
+        }
+        return result.join(this.delimiter);
+    }
+
 }
